@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: Kings-n-Things
+## Notes: Buff bar for the raid buffs and consumables you should have
+## Author: You
+## Version: 1.0
+## OptionalDeps: Rally, ElvUI
+## SavedVariables: KingsNThingsDB
+
+KingsNThings.lua

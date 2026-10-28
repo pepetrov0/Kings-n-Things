@@ -1,6 +1,7 @@
 --[[ Kings-n-Things - buff bar for raid buffs and consumables (WotLK 3.3.5)
      A column of icons for the buffs you should have: grayed out while you
-     lack one, in colour with the time left while you have it. A buff is
+     lack one, in colour with a cooldown sweep and the time left while you
+     have it. A buff is
      shown when the class that casts it is in the group. Blessings and
      shouts follow Rally's assignments when Rally is loaded, otherwise the
      same priority Rally's auto-assign uses.
@@ -128,28 +129,38 @@ end
 local function IconSize() return db.icon or 28 end
 local function TextSize() return db.text or 14 end
 
--- time left on my aura: nil when absent, 0 when it has no timer
+-- time left on my aura: nil when absent, 0 when it has no timer; with the
+-- aura index and, for the sweeper, its start and duration
 local function AuraLeft(buff)
 	for i = 1, 40 do
-		local name, _, _, _, _, _, expires = UnitBuff("player", i)
+		local name, _, _, _, _, duration, expires = UnitBuff("player", i)
 		if not name then return nil end
 		for _, a in ipairs(buff.auras) do
-			if a == name then return (expires and expires > 0) and math.max(expires - GetTime(), 0) or 0, i end
+			if a == name then
+				if expires and expires > 0 and duration and duration > 0 then
+					return math.max(expires - GetTime(), 0), i, expires - duration, duration
+				end
+				return 0, i
+			end
 		end
 	end
 end
 
--- time left on the matching aura (0 = no timer, nil = absent), its icon and index
+-- time left on the matching aura (0 = no timer, nil = absent), its icon,
+-- index and, for the sweeper, its start and duration
 local function ConsumableInfo(key)
 	local c = CONSUMABLES[key]
 	local found = 0
 	for i = 1, 40 do
-		local name, _, tex, _, _, _, expires = UnitBuff(c.unit, i)
+		local name, _, tex, _, _, duration, expires = UnitBuff(c.unit, i)
 		if not name then break end
 		if c.match(name) then
 			found = found + 1
 			if found == (c.nth or 1) then
-				return (expires and expires > 0) and math.max(expires - GetTime(), 0) or 0, tex, i
+				if expires and expires > 0 and duration and duration > 0 then
+					return math.max(expires - GetTime(), 0), tex, i, expires - duration, duration
+				end
+				return 0, tex, i
 			end
 		end
 	end
@@ -344,6 +355,15 @@ local function GetBarIcon(i)
 	f.tex = f:CreateTexture(nil, "ARTWORK")
 	f.tex:SetAllPoints()
 	f.tex:SetTexCoord(unpack(ICON_CROP))
+	-- Blizzard's cooldown swipe, over the icon while the aura ticks down;
+	-- reversed so a fresh buff is bright and darkens as it runs out, and
+	-- opted out of OmniCC / ElvUI cooldown text (the bar has its own timer)
+	f.cd = CreateFrame("Cooldown", nil, f, "CooldownFrameTemplate")
+	f.cd:SetAllPoints()
+	f.cd:SetReverse(true)
+	f.cd.noCooldownCount, f.cd.noOCC = true, true
+	-- on the icon, not the swipe: the swipe hides itself when it is cleared
+	-- or runs out, and would take the text with it
 	f.time = f:CreateFontString(nil, "OVERLAY")
 	-- the icon shows the buff tooltip; drags and the options menu still reach the bar
 	f:EnableMouse(true)
@@ -393,12 +413,13 @@ function UpdateBar()
 	-- so they are applied when that signature differs, not on every tick
 	local layout = table.concat({ IconSize(), TextSize(), tostring(db.horiz), tostring(db.flip) }, ":")
 	for i, key in ipairs(keys) do
-		local f, left, icon, index = GetBarIcon(i)
+		local f = GetBarIcon(i)
+		local left, icon, index, start, duration
 		if CONSUMABLES[key] then
-			left, icon, index = ConsumableInfo(key)
+			left, icon, index, start, duration = ConsumableInfo(key)
 			f.unit, f.spellId, f.label = CONSUMABLES[key].unit, nil, CONSUMABLE_LABELS[key]
 		else
-			left, index = AuraLeft(BUFFS[key])
+			left, index, start, duration = AuraLeft(BUFFS[key])
 			icon = BuffIcon(key)
 			f.unit, f.spellId, f.label = "player", SPELL_IDS[key], BUFFS[key].label
 		end
@@ -411,6 +432,17 @@ function UpdateBar()
 		f.tex:SetDesaturated(not left)
 		f.tex:SetAlpha(key == "HORN" and not left and 0.5 or 1) -- its icon is already gray, so fade it instead
 		f.tex:SetVertexColor(left and 1 or 0.6, left and 1 or 0.6, left and 1 or 0.6)
+		-- the sweep is restarted only when the aura's timer changes, not on
+		-- every tick, otherwise it would visibly jump back to full
+		if duration and duration > 0 then
+			if f.cdStart ~= start or f.cdDuration ~= duration then
+				f.cdStart, f.cdDuration = start, duration
+				CooldownFrame_SetTimer(f.cd, start, duration, 1)
+			end
+		elseif f.cdStart then
+			f.cdStart, f.cdDuration = nil, nil
+			CooldownFrame_SetTimer(f.cd, 0, 0, 0) -- clears the sweep
+		end
 		if left and left > 0 then
 			f.time:SetText(FormatLeft(left))
 			if left < 60 then f.time:SetTextColor(1, 0.15, 0.15) else f.time:SetTextColor(1, 1, 1) end

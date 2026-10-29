@@ -9,11 +9,19 @@
      Shift-drag to move (snaps to the screen centre lines), right-click for
      options.
 
-     File layout: Data > Helpers > Bar keys > Bar > Events > Slash.
+     File layout: Logging > Data > Helpers > Bar keys > Bar > Events > Slash.
 ]]
 
 local _, MY_CLASS = UnitClass("player") -- never changes, so looked up once
 local db
+
+---------------------------------------------------------------------------
+-- Logging
+---------------------------------------------------------------------------
+local TAG = "|cff33ff99Kings-n-Things|r"
+local ADDON_VERSION = GetAddOnMetadata("KingsNThings", "Version") or "?"
+local function Log(msg) DEFAULT_CHAT_FRAME:AddMessage(TAG .. " " .. msg) end
+local function LogLoad(hint) Log("v" .. ADDON_VERSION .. " loaded." .. (hint and (" " .. hint) or "")) end
 
 ---------------------------------------------------------------------------
 -- Data
@@ -483,6 +491,7 @@ driver:SetScript("OnEvent", function()
 	db = KingsNThingsDB
 	BuildBar()
 	UpdateBar()
+	LogLoad("/knt to toggle the bar.")
 end)
 
 ---------------------------------------------------------------------------
@@ -498,5 +507,5 @@ SlashCmdList["KINGSNTHINGS"] = function(msg)
 		db.off = not db.off or nil
 	end
 	UpdateBar()
-	print("|cff00ccffKings-n-Things:|r buff bar " .. (db.off and "off" or "on"))
+	Log("buff bar " .. (db.off and "off" or "on"))
 end

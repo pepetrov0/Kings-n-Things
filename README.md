@@ -3,7 +3,7 @@
 *A buff bar for the raid buffs and consumables you should have*
 
 ![WoW WotLK 3.3.5a](https://img.shields.io/badge/WoW-Wrath%20of%20the%20Lich%20King%203.3.5a-9b1c1c?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.0.1-blue?style=flat-square)
 
 A column of buff icons for World of Warcraft: Wrath of the Lich King (3.3.5a). Grayed out while a buff is missing, in colour with a cooldown sweep and the time left while it's active (red under a minute). Split out of [Rally](../Rally).
 
